@@ -10,6 +10,8 @@ int main(void) {
       collect_nextion_bytes(); //non-blocking read
       if(frame_ready) print_completed_frame_line(); //print full frame //clear frame_ready
 
+
+
   }
   //shouldn't reach
   return 0;

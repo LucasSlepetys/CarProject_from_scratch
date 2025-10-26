@@ -55,3 +55,11 @@ void print_completed_frame_line(void) {
 	frame_ready = 0;  // clear flag
 	
 }
+
+void nextion_send_command(const char *cmd) {
+	
+    send_string(cmd);
+    send_one_byte_data(0xFF);
+    send_one_byte_data(0xFF);
+    send_one_byte_data(0xFF);
+}
