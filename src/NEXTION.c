@@ -51,14 +51,12 @@ void handle_frame(const uint8_t *buffer, uint8_t len ) {
 
 	switch(header) {
 
-		case 0x1A: usart_send_string((const uint8_t*)"ERR 1A: invalid name\r\n"); break;
-		case 0x23: usart_send_string((const uint8_t*)"ERR 23: invalid attribute\r\n"); break;
+		//! Won't work if USART is being used to send debugging messages or other things
 
-		case 0x00: // Invalid instruction: 00 FF FF FF
-			if (len == 4) {
-				usart_send_string((const uint8_t *)"Error");
-			}
-			break;
+
+		// case 0x00: usart_send_string((const uint8_t *)"EE 00: Invalid Instruction"); break;
+		// case 0x1A: usart_send_string((const uint8_t*)"ERR 1A: invalid name\r\n"); break;
+		// case 0x23: usart_send_string((const uint8_t*)"ERR 23: invalid attribute\r\n"); break;
 
 		case 0x65: //Touch event: 65 page id event
 
@@ -69,8 +67,8 @@ void handle_frame(const uint8_t *buffer, uint8_t len ) {
 				uint8_t event = buffer[3]; // 1=press, 0=release
 
 				// trigger on release (event==0). Use object name only.
-				if (page == 0 && id == 2 && event == 0) usart_send_string((const uint8_t *)"Onnn");
-				if (page == 0 && id == 3 && event == 0) nextion_send_command("page0.t0.txt=\"OFF\"");
+				if (page==0 && id==2 && event==0) nextion_send_command("t0.txt=\"ON\"");
+            	if (page==0 && id==3 && event==0) nextion_send_command("t0.txt=\"OFF\"");
 
 			}
 			break;
@@ -99,11 +97,11 @@ void nextion_handle_frame(void) {
 	if (!(local_frame_len == 4 && local_frame_buffer[0] == 0x01 &&
 		local_frame_buffer[1] == 0xFF && local_frame_buffer[2] == 0xFF && local_frame_buffer[3] == 0xFF)) {
 
-			for (uint8_t i = 0; i < local_frame_len; i++) {
-				print_hex_byte_as_ascii(local_frame_buffer[i]);
-			} //can be commented out
-			usart_send_byte('\r');
-			usart_send_byte('\n');
+			//for (uint8_t i = 0; i < local_frame_len; i++) {
+			//	print_hex_byte_as_ascii(local_frame_buffer[i]);
+			//} //can be commented out
+			//usart_send_byte('\r');
+			//usart_send_byte('\n');
 
 			handle_frame(local_frame_buffer, local_frame_len); //handles inputs
 		

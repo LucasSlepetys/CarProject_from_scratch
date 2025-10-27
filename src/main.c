@@ -10,7 +10,6 @@ int main(void) {
 
   nextion_send_command("bkcmd=3");
   nextion_send_command("page page0"); // replace page0 with your actual page name
-  nextion_send_command("get page0.t0.txt"); // replace page0 and t0 with exact names
 
 
   
