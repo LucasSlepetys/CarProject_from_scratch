@@ -74,6 +74,27 @@ void print_hex_byte_as_ascii(uint8_t hex_byte){
 	usart_send_byte(']');
 }
 
+void usart_send_int(uint16_t num) {
+    char buffer[10];  // Enough for -32768 to 32767
+    int i = 0;
+
+    // Handle negative numbers
+    if (num < 0) {
+        usart_send_byte('-');
+        num = -num;
+    }
+
+    // Convert number to ASCII by extracting digits in reverse
+    do {
+        buffer[i++] = (num % 10) + '0';  // Convert digit to char
+        num /= 10;
+    } while (num > 0);
+
+    // Send the digits in correct order
+    while (i > 0) {
+        usart_send_byte(buffer[--i]);
+    }
+}
 
 //! -------------------------------
 

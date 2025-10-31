@@ -8,6 +8,7 @@ void program_start();
 void usart_send_byte(uint8_t c);
 void usart_send_array(uint8_t *c, uint16_t len);
 void usart_send_string(const uint8_t *str);
+void usart_send_int(uint16_t num);
 void print_hex_byte_as_ascii(uint8_t hex_byte);
 
 

@@ -111,8 +111,6 @@ void nextion_handle_frame(void) {
 }
 
 
-
-
 void nextion_print_FFs() {
 	for (int i = 0; i < 3; i++) usart_send_byte(0xFF);
 }
