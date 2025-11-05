@@ -47,9 +47,9 @@
 
 //     if (speed_1023 >= 0) {
 //         motor_forward();
-//         OCR1A = (uint16_t)speed_1023; //PWM PORT //from 0 to 1023
+//         OCR2B  = (uint16_t)speed_1023; //PWM PORT //from 0 to 1023
 //     } else {
 //         motor_reverse();
-//         OCR1A = (uint16_t)(-speed_1023); //PWM PORT //from 0 to 1023 //Makes speed positive again
+//         OCR2B  = (uint16_t)(-speed_1023); //PWM PORT //from 0 to 1023 //Makes speed positive again
 //     }
 // }

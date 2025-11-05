@@ -3,6 +3,7 @@
 #include "ADC.h"
 #include "TB6612.h"
 //#include "NEXTION.h"
+#include "RPM.h"
 
 //#include "L298N.h"
 
@@ -20,6 +21,8 @@ int main(void) {
 
   MILLIS_INIT();
   ADC_START();
+  RPM_init();
+
   sei(); //enable global interrupt
   program_start(); 
 
@@ -35,26 +38,20 @@ int main(void) {
   DDRD &= ~(1 << PD7);
   PORTD |= (1 << PD7); //pull up resistor
 
-  uint32_t lastLight = millis();
+  uint32_t lastPrint = millis();
 
   uint16_t speed = 0;
   uint16_t direction = 1;
 
   while(1) {
 
-    nextion_handle_frame();
-    speed = adc_read(3);
-    usart_send_string("Pot value 1: "); usart_send_int(speed); usart_send_byte('\n');
-    if (speed < 300) speed = 300;
-    if (!direction) speed *= -1;
-    motor_set_speed(speed);
-
-    uint32_t now = millis();
-    if(now - lastLight >= 50) {
-      if(!(PIND & (1 << PD7))) {
-            direction = !direction;
-        } 
-    }
+        
+        // print ~10x per second
+        if (millis() - lastPrint >= 100) {
+          lastPrint = millis();
+          float rpm = get_RPM();
+          usart_send_string("RPM: "); usart_send_int((uint16_t)(rpm+0.5f)); usart_send_byte('\n');
+        }
 
   }
 

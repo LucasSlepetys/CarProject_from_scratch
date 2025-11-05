@@ -44,9 +44,9 @@ void motor_set_speed(int16_t speed_1023) {
 
     if (speed_1023 >= 0) {
         motor_forward();
-        OCR1A = (uint16_t)speed_1023;        // 0..1023
+        OCR2B  = (uint16_t)speed_1023;        // 0..1023
     } else {
         motor_reverse();
-        OCR1A = (uint16_t)(-speed_1023);
+        OCR2B  = (uint16_t)(-speed_1023);
     }
 }
