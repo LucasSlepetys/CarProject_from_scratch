@@ -1,55 +1,71 @@
-// //ENA -> D9 (OC1A, PWM)
-// //IN1 -> D3
-// //IN2 -> D4
-// //OUT1/OUT2 -> Motor
+//ENA -> D3 (OC2B, PWM)
+//IN1 -> D4
+//IN2 -> D5
+//OUT1/OUT2 -> Motor
 
-// #include "L298N.h"
-// #include "PWM.h"
+#include "L298N.h"
+#include "PWM.h"
 
-// #define IN1_PIN PD3
-// #define IN2_PIN PD4
+#define IN1_PIN PD4
+#define IN2_PIN PD5
 
-// void L298N_INIT() {
+void L298N_INIT() {
     
-//     //INIT PWM for speed control
-//     PWM_INIT();
+    //INIT PWM for speed control
+    PWM_INIT();
 
-//     //Make IN1_PIN and IN2_PIN as outputs
-//     DDRD |= (1 << IN1_PIN) | (1 << IN2_PIN);
+    //Make IN1_PIN and IN2_PIN as outputs
+    DDRD |= (1 << IN1_PIN) | (1 << IN2_PIN);
 
-//     //starts with coast:
-//     motor_coast();
+    //starts with coast:
+    motor_coast();
 
-// }
+}
 
-// void motor_forward(void) {
-//     PORTD |= (1 << IN1_PIN);   // D3 HIGH
-//     PORTD &= ~(1 << IN2_PIN);   // D4 LOW
-// }
+void motor_forward(void) {
+    PORTD |= (1 << IN1_PIN);   
+    PORTD &= ~(1 << IN2_PIN);   
+}
 
-// void motor_reverse(void) {
-//     PORTD &= ~(1 << IN1_PIN);   // D3 LOW
-//     PORTD |= (1 << IN2_PIN);   // D4 HIGH
-// }
+void motor_reverse(void) {
+    PORTD &= ~(1 << IN1_PIN);   
+    PORTD |= (1 << IN2_PIN);   
+}
 
-// void motor_brake(void) {
-//     PORTD |= (1 << IN1_PIN) | (1 << IN2_PIN); // both HIGH
-// }
+void motor_brake(void) {
+    PORTD |= (1 << IN1_PIN) | (1 << IN2_PIN); // both HIGH
+}
 
-// void motor_coast(void) {
-//     PORTD &= ~((1 << IN1_PIN) | (1 << IN2_PIN)); // both LOW
-// }
+void motor_coast(void) {
+    PORTD &= ~((1 << IN1_PIN) | (1 << IN2_PIN)); // both LOW
+}
 
-// void motor_set_speed(int16_t speed_1023) {
+void motor_set_speed(int16_t speed_1023) {
 
-//     if (speed_1023 > 1023) speed_1023 = 1023;
-//     if (speed_1023 < -1023) speed_1023 = -1023;
+    // -1023 .. 1023
+    if (speed_1023 > 1023)  speed_1023 = 1023;
+    if (speed_1023 < -1023) speed_1023 = -1023;
 
-//     if (speed_1023 >= 0) {
-//         motor_forward();
-//         OCR2B  = (uint16_t)speed_1023; //PWM PORT //from 0 to 1023
-//     } else {
-//         motor_reverse();
-//         OCR2B  = (uint16_t)(-speed_1023); //PWM PORT //from 0 to 1023 //Makes speed positive again
-//     }
-// }
+    // If zero then coast (or brake) and 0% duty
+    if (speed_1023 == 0) {
+        motor_coast();   // or motor_brake();
+        OCR2B = 0;
+        return;
+    }
+
+    // Magnitude: 0..1023
+    uint16_t mag = (speed_1023 >= 0) ? speed_1023 : -speed_1023;
+
+    // Scale 0..1023 to 0..255
+    uint8_t duty = (uint8_t)((uint32_t)mag * 255 / 1023);
+
+    // Set direction based on sign
+    if (speed_1023 > 0) {
+        motor_forward();
+    } else {    // speed_1023 < 0
+        motor_reverse();
+    }
+
+    // Apply duty
+    OCR2B = duty;
+}

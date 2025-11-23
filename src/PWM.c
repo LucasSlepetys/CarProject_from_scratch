@@ -10,7 +10,7 @@ void PWM_INIT(void) {
     TCCR2A = 0;                  
     TCCR2B = 0;
 
-    //Wave form generation mode = fast pwm, 10 bit of resolution
+    //Wave form generation mode = fast pwm, 8 bit of resolution
     TCCR2A = (1 << WGM21) | (1 << WGM20);
 
     //NON-inverting mode, for fast pwm, for OCR2B, port D3
@@ -23,10 +23,3 @@ void PWM_INIT(void) {
     OCR2B  = 0; // start at 0% duty
 
 }
-
-// void LED_brightness(uint16_t brightness) {
-
-//     if (brightness > 1023) brightness = 1023;
-//     OCR1A = brightness; //LED PORT //from 0 to 1023
-// }
-
