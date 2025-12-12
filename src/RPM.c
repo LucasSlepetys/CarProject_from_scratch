@@ -8,8 +8,8 @@
 #define OUTLIER_BAND   0.35f       // ±35% clamp
 #define EMA_ALPHA      0.30f       // recent readings weighted more
 
-// size the "too-fast" gate from RPM_max≈1500
-#define DT_MIN_TICKS   700         // ~0.8 * dt_min(1200–1500 rpm)
+// size the "too-fast" gate
+#define DT_MIN_TICKS   400         // ~0.8 * dt_min(1200–1500 rpm) //! Needs tunning //! Calculate with expected RPM range
 
 
 
