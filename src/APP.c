@@ -1,8 +1,16 @@
 // APP.c
 #include "APP.h"
 #include "NEXTION.h"   // for nextion_send_command, etc.
+#include "L298N.h"
+#include "TIMER.h"
+#include "RPM.h"
+#include "MOTOR.h"
 #include <string.h>    // if needed
 
+#define N_SLOTS        12 //Could be in systems
+#define WHEEL_DIAMETER_M   0.045f
+#define PI_F               3.14159265f
+#define WHEEL_CIRC_M       (PI_F * WHEEL_DIAMETER_M)  // circumference = pi*D
 
 // -----------------------------------------------------------------------------
 //! App state machine (high-level behaviour)
@@ -39,6 +47,25 @@ static param_state_t g_param_state;
 // flags 
 static uint8_t g_start_pressed   = 0; //Start button
 static uint8_t g_restart_pressed = 0; //Restart button
+
+//! Run Context for when motor is running:
+typedef enum {
+    SEGMENT_1 = 1,
+    SEGMENT_2 = 2
+} segment_t;
+
+static segment_t g_seg = SEGMENT_1;
+
+static float g_seg_target_dist_m = 0.0f; 
+static float g_seg_target_time_s = 0.0f;
+static float g_seg_target_speed_mps = 0.0f;
+
+uint32_t pulses;
+
+static float g_seg_dist_m = 0.0f;      // distance traveled in current segment
+static uint32_t g_seg_start_ms = 0;    // Showing time in Nextion
+static float current_measured_speed;   //Showing current measured speed in nextion
+
 
 // ---------- UI helper to display distances and times selected by user in second page in nextion ---------- //Chatgpt for debugging
 
@@ -197,9 +224,21 @@ void app_update(void)
             nextion_send_command("page page1");
             ui_update_page1_title();
             nextion_send_command("tStatus.txt=\"In progress\"");
+
+            g_seg = SEGMENT_1;
+            g_seg_target_dist_m = (float) g_route_params.d1;    
+            g_seg_target_time_s = (float)g_route_params.t1;
             
-            //! Sends information to motor driver to start with correct speed 
-            // motor_start_route(&g_route_params);
+            g_seg_target_speed_mps = g_seg_target_dist_m / g_seg_target_time_s;
+
+
+            g_seg_dist_m = 0.0f;
+            g_seg_start_ms = millis(); // For time display in nextion
+            
+
+            RPM_clear_pulses(); //starts counting pulses from zero
+            motor_init(); //Starts PI control motor driver
+
             g_app_state = APP_STATE_RUNNING;
             break;
 
@@ -209,12 +248,39 @@ void app_update(void)
         // Updates fields of nextion while running
         case APP_STATE_RUNNING:
 
-            // motor_update();
-            // ui_update_runtime_fields();
+            pulses = RPM_take_pulses_and_clear();    
+            g_seg_dist_m += pulses * (WHEEL_CIRC_M / (float)N_SLOTS);
 
-            //TEMP: for now, just mark completed immediately:
-            nextion_send_command("tStatus.txt=\"Completed\"");
-            g_app_state = APP_STATE_COMPLETED;
+            current_measured_speed = update_motor(g_seg_target_speed_mps);
+            // ui_update_runtime_fields(g_seg); //depends on which g_seg we are in for updating
+            
+            //! Checks if distance of first or second segment has been traveled
+            //Switch segments accordingly
+
+            if(g_seg_dist_m >= g_seg_target_dist_m) {
+
+                if (g_seg == SEGMENT_1) {
+                    // switch to segment 2
+                    g_seg = SEGMENT_2;
+
+                    g_seg_target_dist_m = (float)g_route_params.d2;
+                    g_seg_target_time_s = (float)g_route_params.t2;
+                    g_seg_target_speed_mps = g_seg_target_dist_m / g_seg_target_time_s;
+
+                    g_seg_dist_m = 0.0f;
+                    g_seg_start_ms = millis();
+
+                    RPM_clear_pulses();
+                    motor_reset_controller();
+
+                } else {
+                    // finished segment 2 -> stop
+                    motor_set_speed(0);
+                    nextion_send_command("tStatus.txt=\"Completed\"");
+                    g_app_state = APP_STATE_COMPLETED;
+                }
+            }
+
             break;
         
 
@@ -222,6 +288,7 @@ void app_update(void)
         // When pressed: Returns to intial conditions and page0
         case APP_STATE_COMPLETED:
             if (g_restart_pressed) {
+                motor_set_speed(0);
                 g_restart_pressed = 0;
                 nextion_send_command("page page0");
                 g_param_state = PARAM_STATE_IDLE;

@@ -42,8 +42,6 @@ int main(void) {
         nextion_handle_frame();
         app_update();
 
-        
-        
     }
 
     //shouldn't reach

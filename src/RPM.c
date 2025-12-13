@@ -17,6 +17,8 @@ volatile uint16_t last_ticks = 0;
 volatile uint16_t period_ticks = 0;
 volatile uint8_t  new_period = 0;
 
+volatile uint32_t pulse_count = 0; // total accepted pulses since last reset
+
 ISR(INT0_vect) {
 
     uint16_t now = TCNT1;
@@ -28,8 +30,42 @@ ISR(INT0_vect) {
     if (dt > DT_MIN_TICKS) {                    // 100 ticks = 50 µs
         period_ticks = dt;
         new_period   = 1;
+
+        pulse_count++;
     }
 }
+
+uint32_t RPM_get_pulse_count(void) {
+
+    uint32_t c;
+
+    uint8_t sreg = sreg; cli(); //pause interrupts
+    c = pulse_count;
+    SREG = sreg; //resume interrupts
+
+    return c;
+}
+
+uint32_t RPM_take_pulses_and_clear(void)
+{
+    uint32_t c;
+
+    uint8_t sreg = SREG; cli();
+    c = pulse_count;
+    pulse_count = 0;
+    SREG = sreg;
+
+    return c;
+}
+
+void RPM_clear_pulses(void)
+{
+    uint8_t sreg = SREG; cli();
+    pulse_count = 0;
+    SREG = sreg;
+}
+
+
 
 void RPM_init(void) {
 
