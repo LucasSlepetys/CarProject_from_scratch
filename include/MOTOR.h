@@ -5,5 +5,6 @@
 
 void motor_init(void);
 float update_motor(float target_speed);
+void motor_reset_controller(void);
 
 #endif

@@ -2,7 +2,7 @@
 #include "TIMER.h"
 
 // --- top of file ---
-#define N_SLOTS        12
+#define N_SLOTS        24           // Holes + closed slots due to edge triggering
 #define TICK_S         4e-6        // prescaler 64 → 4 µs per tick
 #define TIMEOUT_MS     200         // a bit more forgiving than 120
 #define OUTLIER_BAND   0.35f       // ±35% clamp
@@ -39,7 +39,7 @@ uint32_t RPM_get_pulse_count(void) {
 
     uint32_t c;
 
-    uint8_t sreg = sreg; cli(); //pause interrupts
+    uint8_t sreg = SREG; cli(); //pause interrupts
     c = pulse_count;
     SREG = sreg; //resume interrupts
 

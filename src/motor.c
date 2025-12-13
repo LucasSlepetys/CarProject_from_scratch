@@ -15,7 +15,9 @@
 
 // --- Output limits, Units: output is PWM --
 #define PWM_MAX 1023
-#define PWM_MIN_MOVE 300    //! to be tune (stall threshold)
+#define PWM_MIN_START   750   // higher, just to break static friction
+#define PWM_MIN_MOVE    600   // lower, to keep moving once spinning
+#define START_RPM_EPS   5.0f  // RPM threshold to consider "moving"
 
 // --- Time control ---
 #define CTRL_PERIOD_MS 20u //20 mili seconds
@@ -25,17 +27,18 @@
 #define ITERM_MIN (-400.0f)
 #define ITERM_MAX (400.0f)
 
-        
 static float i_term = 0.0f;
 static int16_t last_u = 0;
 static uint32_t last_time_ms = 0;
 
 static float last_measured_speed = 0.0f;
 
+static float rpm;
+
 
 float get_actual_speed() {
 
-    float rpm = get_RPM();
+    rpm = get_RPM();
     return (WHEEL_CIRC_M * rpm) / 60.0f;
 
 }
@@ -81,11 +84,20 @@ float update_motor(float target_speed) {
 
     int16_t u = (int16_t)u_f;
 
-    // add minimum PWM in order for motor not to stall (needs tunning)
-    if (target_speed > 0.01f && u > 0 && u < PWM_MIN_MOVE) u = PWM_MIN_MOVE;
+    // Want to move but motor is basically stopped due to static friction
+    if (target_speed > 0.01f && rpm < START_RPM_EPS) {
+        if (u > 0 && u < PWM_MIN_START) {
+            u = PWM_MIN_START;
+        }
+    }
+    // Otherwise: normal minimum to avoid stalling
+    else {
+        if (target_speed > 0.01f && u > 0 && u < PWM_MIN_MOVE) {
+            u = PWM_MIN_MOVE;
+        }
+    }
 
-
-    // if target is ~0, stop and reset integrator
+    // If target is zero → stop & reset integrator
     if (target_speed <= 0.01f) {
         i_term = 0.0f;
         u = 0;

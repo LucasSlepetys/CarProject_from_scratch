@@ -48,7 +48,7 @@ void motor_set_speed(int16_t speed_1023) {
 
     // If zero then coast (or brake) and 0% duty
     if (speed_1023 == 0) {
-        motor_coast();   // or motor_brake();
+        motor_coast();
         OCR2B = 0;
         return;
     }

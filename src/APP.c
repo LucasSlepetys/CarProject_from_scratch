@@ -7,10 +7,13 @@
 #include "MOTOR.h"
 #include <string.h>    // if needed
 
-#define N_SLOTS        12 //Could be in systems
+#define N_SLOTS        24 //Could be in systems
 #define WHEEL_DIAMETER_M   0.045f
 #define PI_F               3.14159265f
 #define WHEEL_CIRC_M       (PI_F * WHEEL_DIAMETER_M)  // circumference = pi*D
+#define UI_PERIOD_MS 200u // showing information in second page
+
+static uint32_t g_ui_last_ms = 0; //tracking time to show info on page1 while car is running
 
 // -----------------------------------------------------------------------------
 //! App state machine (high-level behaviour)
@@ -58,7 +61,7 @@ static segment_t g_seg = SEGMENT_1;
 
 static float g_seg_target_dist_m = 0.0f; 
 static float g_seg_target_time_s = 0.0f;
-static float g_seg_target_speed_mps = 0.0f;
+static float v_req = 0.0f;
 
 uint32_t pulses;
 
@@ -66,6 +69,24 @@ static float g_seg_dist_m = 0.0f;      // distance traveled in current segment
 static uint32_t g_seg_start_ms = 0;    // Showing time in Nextion
 static float current_measured_speed;   //Showing current measured speed in nextion
 
+
+
+
+//Converting units:
+
+// speed as: cm/s (int) to due to float on Nextion
+static uint32_t mps_to_cms(float v_mps)
+{
+    if (v_mps < 0.0f) v_mps = 0.0f;
+    return (uint32_t)(v_mps * 100.0f + 0.5f); // 0.25 m/s -> 25 cm/s
+}
+
+// distance shown as: cm (iunt)
+static uint32_t m_to_cm(float d_m)
+{
+    if (d_m < 0.0f) d_m = 0.0f;
+    return (uint32_t)(d_m * 100.0f + 0.5f);   // 1.23 m -> 123 cm
+}
 
 // ---------- UI helper to display distances and times selected by user in second page in nextion ---------- //Chatgpt for debugging
 
@@ -79,6 +100,47 @@ static void ui_update_page1_title(void)
             (unsigned long)g_route_params.d2,
             (unsigned long)g_route_params.t2);
     nextion_send_command(cmd);
+}
+
+static void ui_set_num_u32(const char *obj, uint32_t v)
+{
+    char cmd[48];
+    // e.g. "page1.distance1"
+    snprintf(cmd, sizeof(cmd), "%s.val=%lu", obj, (unsigned long)v);
+    nextion_send_command(cmd);
+}
+
+void ui_update_runtime_fields(segment_t seg, float dist_m, uint32_t seg_start_ms,float speed_mps) {
+
+    uint32_t now = millis();
+
+    if ((uint32_t)(now - g_ui_last_ms) < UI_PERIOD_MS) return;
+
+    g_ui_last_ms = now;
+
+    uint32_t elapsed_s = (now - seg_start_ms) / 1000u;
+
+    uint32_t dist_cm  = m_to_cm(dist_m);
+    uint32_t speed_cms = mps_to_cms(speed_mps);
+
+    if (seg == SEGMENT_1) {
+        ui_set_num_u32("page1.distance1", dist_cm);
+        ui_set_num_u32("page1.time1",     elapsed_s);
+        ui_set_num_u32("page1.speed1",    speed_cms);
+    } else { // SEGMENT_2
+        ui_set_num_u32("page1.distance2", dist_cm);
+        ui_set_num_u32("page1.time2",     elapsed_s);
+        ui_set_num_u32("page1.speed2",    speed_cms);
+    }
+}
+
+static void ui_clear_runtime_fields(void)
+{
+    // Segment 1
+    ui_update_runtime_fields(SEGMENT_1, 0.0f, 0, 0.0f);
+
+    // Segment 2
+    ui_update_runtime_fields(SEGMENT_2, 0.0f, 0, 0.0f);
 }
 
 // ---------- Param Finete State Machine ----------
@@ -228,16 +290,18 @@ void app_update(void)
             g_seg = SEGMENT_1;
             g_seg_target_dist_m = (float) g_route_params.d1;    
             g_seg_target_time_s = (float)g_route_params.t1;
-            
-            g_seg_target_speed_mps = g_seg_target_dist_m / g_seg_target_time_s;
 
 
             g_seg_dist_m = 0.0f;
-            g_seg_start_ms = millis(); // For time display in nextion
+            g_seg_start_ms = millis(); // For time display in nextion //Start time of segment
             
 
             RPM_clear_pulses(); //starts counting pulses from zero
             motor_init(); //Starts PI control motor driver
+
+            //clear fields for segment 1 and 2 in page 1:
+            ui_clear_runtime_fields();
+
 
             g_app_state = APP_STATE_RUNNING;
             break;
@@ -251,8 +315,14 @@ void app_update(void)
             pulses = RPM_take_pulses_and_clear();    
             g_seg_dist_m += pulses * (WHEEL_CIRC_M / (float)N_SLOTS);
 
-            current_measured_speed = update_motor(g_seg_target_speed_mps);
-            // ui_update_runtime_fields(g_seg); //depends on which g_seg we are in for updating
+            float dist_rem = g_seg_target_dist_m - g_seg_dist_m;
+            float time_rem = g_seg_target_time_s - ((millis() - g_seg_start_ms) / 1000.0f);
+            if (time_rem < 0.05f) time_rem = 0.05f; //stop divide by 0
+            v_req = dist_rem / time_rem;
+
+            current_measured_speed = update_motor(v_req); //passes v_req speed based on distance and time remaining
+            //Updates UI every UI_PERIOD_MS
+            ui_update_runtime_fields(g_seg, g_seg_dist_m, g_seg_start_ms, current_measured_speed); //depends on which g_seg we are in for updating
             
             //! Checks if distance of first or second segment has been traveled
             //Switch segments accordingly
@@ -265,20 +335,29 @@ void app_update(void)
 
                     g_seg_target_dist_m = (float)g_route_params.d2;
                     g_seg_target_time_s = (float)g_route_params.t2;
-                    g_seg_target_speed_mps = g_seg_target_dist_m / g_seg_target_time_s;
 
                     g_seg_dist_m = 0.0f;
-                    g_seg_start_ms = millis();
+                    g_seg_start_ms = millis(); //start time of segment
 
                     RPM_clear_pulses();
                     motor_reset_controller();
 
                 } else {
                     // finished segment 2 -> stop
-                    motor_set_speed(0);
+                    motor_brake();motor_set_speed(0);
                     nextion_send_command("tStatus.txt=\"Completed\"");
                     g_app_state = APP_STATE_COMPLETED;
                 }
+            }
+
+            //User interrupts process and restarts car
+            if (g_restart_pressed) {
+                motor_brake();
+                motor_set_speed(0);
+                g_restart_pressed = 0;
+                nextion_send_command("page page0");
+                g_param_state = PARAM_STATE_IDLE;
+                g_app_state   = APP_STATE_IDLE;
             }
 
             break;
